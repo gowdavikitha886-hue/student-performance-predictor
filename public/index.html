@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPPS · Student Performance Prediction System</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<!-- ==================== AUTH SCREEN ==================== -->
+<div id="authScreen">
+  <div class="auth-hero">
+    <div class="logo"><span class="badge-ring"><i class="bi bi-mortarboard-fill"></i></span> SPPS · Student Performance</div>
+    <div>
+      <h1>Predict student performance with machine learning.</h1>
+      <p class="lead mt-3">Upload a dataset, train five ML algorithms with cross-validation, and get explainable predictions with personalized student recommendations — backed by a real REST API and database.</p>
+    </div>
+    <div class="hero-points">
+      <div><i class="bi bi-check2-circle"></i> Data preprocessing summary + 70/15/15 split</div>
+      <div><i class="bi bi-check2-circle"></i> 5-fold cross-validation · Precision, Recall, F1, ROC-AUC</div>
+      <div><i class="bi bi-check2-circle"></i> Prediction explanations &amp; student recommendations</div>
+      <div><i class="bi bi-check2-circle"></i> Node.js REST API · SQLite history · model export</div>
+    </div>
+  </div>
+
+  <div class="auth-form-side">
+    <div class="auth-card">
+      <h2 id="authTitle">Welcome back</h2>
+      <p class="sub" id="authSub">Sign in to train models and save your predictions.</p>
+
+      <form id="authForm" novalidate>
+        <div id="nameField" class="mb-3 d-none">
+          <label class="form-label">Full name</label>
+          <input id="authName" class="form-control" type="text" placeholder="e.g. Priya Sharma" autocomplete="name">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email address</label>
+          <input id="authEmail" class="form-control" type="email" placeholder="you@school.edu" autocomplete="email" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <input id="authPassword" class="form-control" type="password" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+        <div id="authError" class="alert alert-danger py-2 d-none small"></div>
+        <button id="authSubmit" class="btn btn-brand w-100 py-2" type="submit">Sign in</button>
+      </form>
+
+      <div class="demo-chip mt-3"><i class="bi bi-shield-lock"></i> Demo admin — <b>admin@spps.local</b> / <b>admin123</b></div>
+      <div class="auth-switch"><span id="authSwitchText">New to SPPS?</span> <a id="authSwitchLink">Create an account</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== APP SHELL ==================== -->
+<div id="appScreen">
+
+  <div class="topbar">
+    <div class="brand"><span class="ico"><i class="bi bi-mortarboard-fill"></i></span> SPPS <span class="d-none d-md-inline muted" style="font-weight:600;font-size:13.5px">Student Performance Prediction</span></div>
+    <div class="d-flex align-items-center gap-2">
+      <button class="btn btn-sm btn-outline-secondary rounded-circle theme-btn" id="themeBtn" title="Toggle dark mode"><i class="bi bi-moon-stars"></i></button>
+      <div class="dropdown">
+      <div class="user-chip" data-bs-toggle="dropdown" aria-expanded="false">
+        <div class="avatar" id="avatarInitials">U</div>
+        <div class="meta d-none d-sm-block">
+          <b id="userName">User</b>
+          <small id="userEmail">user@mail.com</small>
+        </div>
+        <i class="bi bi-chevron-down muted small"></i>
+      </div>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><span class="dropdown-item-text small muted">Signed in as</span></li>
+        <li><span class="dropdown-item-text fw-bold" id="menuEmail">—</span></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><button class="dropdown-item" id="goDashboard"><i class="bi bi-speedometer2 me-2"></i>Dashboard</button></li>
+        <li><button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#accountModal"><i class="bi bi-person-gear me-2"></i>Account settings</button></li>
+        <li><span class="dropdown-item"><span class="chip blue" id="roleBadge">user</span></span></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><button class="dropdown-item text-danger" id="logoutBtn"><i class="bi bi-box-arrow-right me-2"></i>Log out</button></li>
+      </ul>
+      </div>
+    </div>
+  </div>
+
+  <nav class="sidebar">
+    <div class="section">Overview</div>
+    <button class="nav-link active" data-page="dashboard"><i class="bi bi-speedometer2"></i> Dashboard</button>
+    <div class="section">ML Workflow</div>
+    <button class="nav-link" data-page="data"><i class="bi bi-database"></i> 1 · Dataset</button>
+    <button class="nav-link" data-page="train"><i class="bi bi-cpu"></i> 2 · Train &amp; Evaluate</button>
+    <button class="nav-link" data-page="predict"><i class="bi bi-stars"></i> 3 · Predict</button>
+    <div class="section">Workspace</div>
+    <button class="nav-link" data-page="history"><i class="bi bi-clock-history"></i> Prediction history</button>
+    <button class="nav-link" data-page="models"><i class="bi bi-box-seam"></i> Saved models</button>
+    <div class="section admin-only d-none">Administration</div>
+    <button class="nav-link admin-only d-none" data-page="admin"><i class="bi bi-people"></i> Admin panel</button>
+    <div class="foot">SPPS v2.0 · Node.js + SQLite backend<br>Model served via REST API</div>
+  </nav>
+
+  <main class="main">
+
+    <!-- ============ DASHBOARD ============ -->
+    <section class="page active" id="page-dashboard">
+      <div class="page-head">
+        <div><h2>Dashboard</h2><p>Your ML activity at a glance — models trained, predictions served and class trends.</p></div>
+        <button class="btn btn-brand" data-goto="data"><i class="bi bi-rocket-takeoff me-1"></i> Start new experiment</button>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3"><div class="stat"><div class="ic" style="background:#4f46e5"><i class="bi bi-graph-up-arrow"></i></div><div><div class="val" id="statPred">0</div><div class="lbl">Predictions</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="stat"><div class="ic" style="background:#7c3aed"><i class="bi bi-box-seam"></i></div><div><div class="val" id="statModels">0</div><div class="lbl">Models saved</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="stat"><div class="ic" style="background:#0891b2"><i class="bi bi-bullseye"></i></div><div><div class="val" id="statConf">0%</div><div class="lbl">Avg confidence</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="stat"><div class="ic" style="background:#16a34a"><i class="bi bi-trophy"></i></div><div><div class="val" id="statAcc">—</div><div class="lbl">Best test accuracy</div></div></div></div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-lg-7"><div class="card"><div class="card-header">Predictions — last 14 days</div><div class="card-body"><div class="canvas-box"><canvas id="chartDaily"></canvas></div></div></div></div>
+        <div class="col-lg-5"><div class="card"><div class="card-header">Predicted class distribution</div><div class="card-body"><div class="canvas-box"><canvas id="chartDist"></canvas></div></div></div></div>
+        <div class="col-lg-5">
+          <div class="card h-100"><div class="card-header">Latest saved model</div><div class="card-body" id="bestModelBox">
+            <div class="empty"><i class="bi bi-box-seam"></i>No model saved yet.<br><button class="btn btn-sm btn-brand mt-2" data-goto="data">Train one now</button></div>
+          </div></div>
+        </div>
+        <div class="col-lg-7"><div class="card"><div class="card-header">Recent predictions</div><div class="card-body p-0">
+          <div class="tbl-wrap" style="border:0;max-height:260px"><table class="table table-hover mb-0">
+            <thead><tr><th>#</th><th>Predicted</th><th>Confidence</th><th>When</th></tr></thead>
+            <tbody id="recentBody"><tr><td colspan="4" class="text-center muted py-4">No predictions yet</td></tr></tbody>
+          </table></div>
+        </div></div></div>
+      </div>
+    </section>
+
+    <!-- ============ 1 · DATASET ============ -->
+    <section class="page" id="page-data">
+      <div class="page-head">
+        <div><h2>1 · Dataset &amp; preprocessing</h2><p>Load data, review how missing/categorical values are handled, then choose the target.</p></div>
+      </div>
+
+      <div class="card mb-3"><div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-5"><label class="form-label">Upload CSV</label><input type="file" id="file" accept=".csv" class="form-control"></div>
+          <div class="col-md-4"><label class="form-label">…or start instantly</label>
+            <div class="d-flex gap-2">
+              <button id="sampleBtn" class="btn btn-outline-primary flex-fill">Use sample dataset</button>
+              <button id="sampleDl" class="btn btn-outline-secondary"><i class="bi bi-download"></i></button>
+            </div>
+          </div>
+          <div class="col-md-3"><label class="form-label">Target column</label>
+            <select id="target" class="form-select"></select></div>
+        </div>
+        <div class="d-flex gap-3 flex-wrap mt-3 small-13" id="dsInfo"></div>
+        <div class="d-flex gap-3 flex-wrap mt-2 small-13 align-items-center">
+          <span class="muted fw-semibold"><i class="bi bi-download me-1"></i>Example files:</span>
+          <a href="/examples/students-sample.csv" download class="badge-like">students-sample.csv <span class="muted">· 60 rows, clean</span></a>
+          <a href="/examples/students-sample-missing.csv" download class="badge-like">students-sample-missing.csv <span class="muted">· 40 rows, blanks (preprocessing demo)</span></a>
+          <span class="muted">→ upload them with the CSV field above</span>
+        </div>
+      </div></div>
+
+      <div id="dataEmpty" class="card"><div class="empty"><i class="bi bi-inbox"></i>No dataset loaded yet — upload a CSV or click “Use sample dataset”.</div></div>
+
+      <div id="dataBox" class="d-none">
+        <div class="row g-3 mb-3">
+          <div class="col-lg-6"><div class="card h-100"><div class="card-header">Target class distribution</div><div class="card-body"><div class="canvas-box sm"><canvas id="chartTarget"></canvas></div></div></div></div>
+          <div class="col-lg-6"><div class="card h-100"><div class="card-header d-flex justify-content-between align-items-center">Numeric histogram
+            <select id="histSel" class="form-select form-select-sm" style="width:auto"></select></div>
+            <div class="card-body"><div class="canvas-box sm"><canvas id="chartHist"></canvas></div></div></div></div>
+          <div class="col-12"><div class="card"><div class="card-header">Feature separation from target (η² — higher = more predictive)</div><div class="card-body"><div class="canvas-box sm"><canvas id="chartSep"></canvas></div></div></div></div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-lg-6"><div class="card h-100"><div class="card-header">Data preprocessing summary</div><div class="card-body p-0">
+            <div class="tbl-wrap" style="border:0"><table class="table table-sm mb-0">
+              <thead><tr><th>Column</th><th>Type</th><th>Missing</th><th>Action taken</th></tr></thead>
+              <tbody id="prepBody"></tbody></table></div>
+            <div class="px-3 py-2 small-13 muted" id="prepNote"></div>
+          </div></div></div>
+          <div class="col-lg-6"><div class="card h-100"><div class="card-header">Column profiling</div><div class="card-body p-0">
+            <div class="tbl-wrap" style="border:0"><table class="table table-sm mb-0">
+              <thead><tr><th>Column</th><th>Unique</th><th>Missing</th><th>Mean / Top value</th></tr></thead>
+              <tbody id="profileBody"></tbody></table></div>
+          </div></div></div>
+          <div class="col-12"><div class="card"><div class="card-header">Data preview (first 6 rows)</div><div class="card-body p-0">
+            <div class="tbl-wrap" style="border:0;max-height:300px" id="dsPreview"></div>
+          </div></div></div>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button class="btn btn-brand px-4" data-goto="train">Continue to training <i class="bi bi-arrow-right ms-1"></i></button>
+          <span class="align-self-center muted small-13">70/15/15 split, 5-fold CV and full metrics run on the next step.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 2 · TRAIN ============ -->
+    <section class="page" id="page-train">
+      <div class="page-head">
+        <div><h2>2 · Train &amp; evaluate</h2><p>Stratified split → 5-fold cross-validation → best model → test metrics, ROC-AUC and explanations of importance.</p></div>
+        <button id="trainBtn" class="btn btn-brand"><i class="bi bi-play-fill me-1"></i> Train all models</button>
+      </div>
+
+      <div id="noData" class="alert alert-info">Load a dataset first on the <a href="#" data-goto="data">Dataset tab</a>.</div>
+
+      <div id="trainArea" class="d-none">
+        <div class="row g-3 mb-3">
+          <div class="col-4 col-md-3 col-lg-2"><div class="metric"><div class="v" id="splitTr">—</div><div class="k">Train 70%</div></div></div>
+          <div class="col-4 col-md-3 col-lg-2"><div class="metric"><div class="v" id="splitVa">—</div><div class="k">Validation 15%</div></div></div>
+          <div class="col-4 col-md-3 col-lg-2"><div class="metric"><div class="v" id="splitTe">—</div><div class="k">Test 15%</div></div></div>
+          <div class="col-md-6 col-lg-6"><div class="card h-100"><div class="card-body py-2 d-flex align-items-center gap-3">
+            <span class="chip blue" id="savedBadge"><i class="bi bi-cloud-check"></i> not trained yet</span>
+            <span class="small-13 muted" id="trainHint">Algorithms: KNN · Logistic Regression · Naive Bayes · Decision Tree · Random Forest</span>
+          </div></div></div>
+        </div>
+
+        <div id="trainResult" class="d-none">
+          <div class="row g-3 mb-3">
+            <div class="col-md-8"><div class="card h-100"><div class="card-header">Cross-validation results (5-fold, macro-F1)</div><div class="card-body p-0">
+              <div class="tbl-wrap" style="border:0"><table class="table table-hover mb-0">
+                <thead><tr><th>Model</th><th>CV Accuracy</th><th>CV Macro-F1</th><th>Test Accuracy</th></tr></thead>
+                <tbody id="cvBody"></tbody></table></div>
+            </div></div></div>
+            <div class="col-md-4"><div class="card h-100"><div class="card-header">Best model</div><div class="card-body">
+              <h4 class="mb-1" id="bestName">—</h4>
+              <div class="muted small-13 mb-3" id="bestMeta">—</div>
+              <div class="row g-2 text-center">
+                <div class="col-6"><div class="metric"><div class="v text-success" id="mAuc">—</div><div class="k">ROC-AUC</div></div></div>
+                <div class="col-6"><div class="metric"><div class="v text-primary" id="mAcc">—</div><div class="k">Accuracy</div></div></div>
+                <div class="col-4"><div class="metric"><div class="v" id="mPre">—</div><div class="k">Precision</div></div></div>
+                <div class="col-4"><div class="metric"><div class="v" id="mRec">—</div><div class="k">Recall</div></div></div>
+                <div class="col-4"><div class="metric"><div class="v" id="mF1">—</div><div class="k">F1</div></div></div>
+              </div>
+            </div></div></div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-lg-6"><div class="card h-100"><div class="card-header">Per-class metrics (test set)</div><div class="card-body p-0">
+              <div class="tbl-wrap" style="border:0"><table class="table table-sm mb-0">
+                <thead><tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1</th><th>Support</th></tr></thead>
+                <tbody id="perClassBody"></tbody></table></div>
+            </div></div></div>
+            <div class="col-lg-6"><div class="card h-100"><div class="card-header">Confusion matrix (test set)</div><div class="card-body" id="cmBox"></div></div></div>
+            <div class="col-lg-6"><div class="card h-100"><div class="card-header">ROC curves (one-vs-rest)</div><div class="card-body"><div class="canvas-box"><canvas id="rocChart"></canvas></div></div></div></div>
+            <div class="col-lg-6"><div class="card h-100"><div class="card-header">Accuracy vs macro-F1</div><div class="card-body"><div class="canvas-box"><canvas id="cmpChart"></canvas></div></div></div></div>
+            <div class="col-12"><div class="card"><div class="card-header">Permutation feature importance (drop in macro-F1 when shuffled)</div><div class="card-body"><div class="canvas-box"><canvas id="impChart"></canvas></div></div></div></div>
+          </div>
+
+          <button class="btn btn-success" data-goto="predict"><i class="bi bi-stars me-1"></i> Go to predictions</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 3 · PREDICT ============ -->
+    <section class="page" id="page-predict">
+      <div class="page-head">
+        <div><h2>3 · Predict</h2><p>Predictions run on the <b>backend API</b> using your saved model — with explanations and recommendations.</p></div>
+        <div style="min-width:280px"><label class="form-label small-13 muted mb-1">Model served by API</label>
+          <select id="modelSel" class="form-select"></select></div>
+      </div>
+
+      <div id="noModel" class="alert alert-info">No saved model yet — train one on the <a href="#" data-goto="train">Training tab</a>.</div>
+
+      <div id="predictArea" class="d-none">
+        <div class="row g-3">
+          <div class="col-lg-5">
+            <div class="card"><div class="card-header">Student details</div><div class="card-body">
+              <form id="predictForm"><div class="row g-3" id="formFields"></div>
+                <button class="btn btn-brand w-100 mt-3 py-2" id="predictBtn"><i class="bi bi-lightning-charge me-1"></i> Predict via API</button>
+              </form>
+            </div></div>
+          </div>
+
+          <div class="col-lg-7" id="resBox" style="display:none">
+            <div class="result-hero mb-3">
+              <div class="small" style="opacity:.85" id="resTarget">Predicted performance</div>
+              <div class="pred" id="resPred">—</div>
+              <div class="mt-1" id="resModelName">—</div>
+              <div class="progress mt-3" style="height:12px;background:rgba(255,255,255,.25)">
+                <div id="resConf" class="progress-bar bg-white text-dark fw-bold" style="width:0%">0%</div>
+              </div>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-md-5"><div class="card h-100"><div class="card-header">Class probabilities</div><div class="card-body"><div class="canvas-box sm"><canvas id="probChart"></canvas></div></div></div></div>
+              <div class="col-md-7"><div class="card h-100"><div class="card-header">Why this prediction?</div><div class="card-body" id="explainBox"></div></div></div>
+              <div class="col-12"><div class="card"><div class="card-header"><i class="bi bi-lightbulb me-1"></i> Student recommendations</div><div class="card-body" id="recBox"></div></div></div>
+              <div class="col-12 d-flex gap-2">
+                <button class="btn btn-outline-danger" id="reportBtn"><i class="bi bi-file-earmark-arrow-down me-1"></i> Download report</button>
+                <button class="btn btn-outline-secondary" data-goto="history"><i class="bi bi-clock-history me-1"></i> View history</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt-3" id="batchCard"><div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+          <div>
+            <h5 class="mb-0"><i class="bi bi-files me-1"></i> Batch prediction (CSV)</h5>
+            <div class="muted small-13">Upload a CSV whose columns match the model's features (max 500 rows) — predictions run on the backend API.</div>
+          </div>
+          <div class="d-flex gap-2 align-items-center">
+            <div class="form-check small-13">
+              <input class="form-check-input" type="checkbox" id="batchSave">
+              <label class="form-check-label" for="batchSave">Save to history</label>
+            </div>
+            <input type="file" id="batchFile" accept=".csv" class="form-control form-control-sm" style="max-width:220px">
+            <a href="/examples/students-batch.csv" download class="btn btn-sm btn-outline-secondary" title="Download a ready-made example CSV (10 rows)"><i class="bi bi-filetype-csv me-1"></i>Example CSV</a>
+            <button class="btn btn-sm btn-primary" id="batchRun" disabled><i class="bi bi-play-circle me-1"></i>Run batch</button>
+            <button class="btn btn-sm btn-outline-success" id="batchDownload" style="display:none"><i class="bi bi-download me-1"></i>Results CSV</button>
+          </div>
+        </div>
+        <div class="small-13 muted" id="batchInfo">No file selected.</div>
+        <div class="tbl-wrap mt-2" id="batchResults" style="display:none;max-height:320px"></div>
+      </div></div>
+    </section>
+    <!-- ============ HISTORY ============ -->
+    <section class="page" id="page-history">
+      <div class="page-head">
+        <div><h2>Prediction history</h2><p>Stored server-side in SQLite — search, filter, paginate and export.</p></div>
+        <div class="d-flex gap-2 flex-wrap">
+          <span class="chip gray align-self-center" id="histCount">0 records</span>
+          <button class="btn btn-outline-secondary btn-sm" id="exportCsv"><i class="bi bi-filetype-csv me-1"></i>Export CSV</button>
+          <button class="btn btn-outline-danger btn-sm" id="clearHist"><i class="bi bi-trash me-1"></i>Clear all</button>
+        </div>
+      </div>
+
+      <div class="card"><div class="card-body">
+        <div class="row g-2 align-items-center mb-3">
+          <div class="col-md-5">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input id="histSearch" type="search" class="form-control" placeholder="Search inputs, model or class…">
+            </div>
+          </div>
+          <div class="col-md-3">
+            <select id="histFilter" class="form-select form-select-sm">
+              <option value="">All classes</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select id="histLimit" class="form-select form-select-sm">
+              <option value="10">10 / page</option>
+              <option value="25">25 / page</option>
+              <option value="50">50 / page</option>
+            </select>
+          </div>
+          <div class="col-md-2 text-md-end"><span class="small-13 muted" id="histRange">—</span></div>
+        </div>
+        <div id="histEmpty" class="empty"><i class="bi bi-clock-history"></i>No predictions match — make one on the Predict tab.</div>
+        <div class="tbl-wrap" style="border:0;display:none" id="histWrap">
+          <table class="table table-hover mb-0">
+            <thead><tr><th>#</th><th>Model</th><th>Inputs</th><th>Predicted</th><th>Confidence</th><th>When</th><th></th></tr></thead>
+            <tbody id="histBody"></tbody>
+          </table>
+        </div>
+        <nav class="d-flex justify-content-between align-items-center mt-3" id="histPager">
+          <button class="btn btn-sm btn-outline-secondary" id="histPrev"><i class="bi bi-chevron-left"></i> Prev</button>
+          <span class="small-13 muted" id="histPageInfo">Page 1</span>
+          <button class="btn btn-sm btn-outline-secondary" id="histNext">Next <i class="bi bi-chevron-right"></i></button>
+        </nav>
+      </div></div>
+    </section>
+
+    <!-- ============ MODELS ============ -->
+    <section class="page" id="page-models">
+      <div class="page-head">
+        <div><h2>Saved models</h2><p>Models stored in the database and served by <span class="mono">POST /api/predict</span>. Download as JSON for deployment.</p></div>
+      </div>
+
+      <div class="card mb-3" id="leaderCard" style="display:none"><div class="card-header">Model leaderboard — saved models compared</div>
+        <div class="card-body"><div class="canvas-box"><canvas id="leaderChart"></canvas></div></div></div>
+
+      <div id="modelsEmpty" class="card"><div class="empty"><i class="bi bi-box-seam"></i>No models saved yet.</div></div>
+      <div class="row g-3" id="modelsGrid"></div>
+    </section>
+
+    <!-- ============ ADMIN ============ -->
+    <section class="page" id="page-admin">
+      <div class="page-head">
+        <div><h2>Admin panel</h2><p>Platform-wide statistics, registered users and recent predictions.</p></div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-2"><div class="stat"><div class="ic" style="background:#4f46e5"><i class="bi bi-people"></i></div><div><div class="val" id="admUsers">—</div><div class="lbl">Users</div></div></div></div>
+        <div class="col-6 col-lg-2"><div class="stat"><div class="ic" style="background:#7c3aed"><i class="bi bi-graph-up"></i></div><div><div class="val" id="admPreds">—</div><div class="lbl">Predictions</div></div></div></div>
+        <div class="col-6 col-lg-2"><div class="stat"><div class="ic" style="background:#0891b2"><i class="bi bi-box-seam"></i></div><div><div class="val" id="admModels">—</div><div class="lbl">Models</div></div></div></div>
+        <div class="col-6 col-lg-2"><div class="stat"><div class="ic" style="background:#16a34a"><i class="bi bi-calendar-day"></i></div><div><div class="val" id="admToday">—</div><div class="lbl">Predictions today</div></div></div></div>
+        <div class="col-6 col-lg-2"><div class="stat"><div class="ic" style="background:#d97706"><i class="bi bi-bullseye"></i></div><div><div class="val" id="admConf">—</div><div class="lbl">Avg confidence</div></div></div></div>
+        <div class="col-6 col-lg-2"><div class="stat"><div class="ic" style="background:#dc2626"><i class="bi bi-shield-check"></i></div><div><div class="val">Admin</div><div class="lbl">Access level</div></div></div></div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-lg-6"><div class="card h-100"><div class="card-header">Registered users</div><div class="card-body p-0">
+          <div class="tbl-wrap" style="border:0"><table class="table table-sm mb-0">
+            <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Predictions</th><th>Models</th><th></th></tr></thead>
+            <tbody id="admUserBody"></tbody></table></div>
+        </div></div></div>
+        <div class="col-lg-6"><div class="card h-100"><div class="card-header">Recent predictions (all users)</div><div class="card-body p-0">
+          <div class="tbl-wrap" style="border:0"><table class="table table-sm mb-0">
+            <thead><tr><th>#</th><th>User</th><th>Predicted</th><th>Conf.</th><th>When</th></tr></thead>
+            <tbody id="admPredBody"></tbody></table></div>
+        </div></div></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ==================== ACCOUNT SETTINGS ==================== -->
+<div class="modal fade" id="accountModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title"><i class="bi bi-person-gear me-1"></i> Account settings</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-6"><div class="card h-100"><div class="card-header">Profile</div><div class="card-body">
+            <label class="form-label">Display name</label>
+            <div class="input-group mb-2">
+              <input id="accName" class="form-control" type="text">
+              <button class="btn btn-primary" id="accNameSave">Save</button>
+            </div>
+            <div class="small-13 muted">Email: <b id="accEmail">—</b> · Role: <b id="accRole">—</b></div>
+          </div></div></div>
+
+          <div class="col-md-6"><div class="card h-100"><div class="card-header">Change password</div><div class="card-body">
+            <input id="accCurPw" class="form-control mb-2" type="password" placeholder="Current password" autocomplete="current-password">
+            <input id="accNewPw" class="form-control mb-2" type="password" placeholder="New password (min 6 chars)" autocomplete="new-password">
+            <button class="btn btn-primary w-100" id="accPwSave">Update password</button>
+            <div class="small-13 muted mt-2">Changing the password logs out all other sessions.</div>
+          </div></div></div>
+
+          <div class="col-12"><div class="card"><div class="card-header d-flex justify-content-between align-items-center">
+            Active sessions <button class="btn btn-sm btn-outline-warning" id="accLogoutOthers">Log out other sessions</button></div>
+            <div class="card-body p-0"><div class="tbl-wrap" style="border:0">
+              <table class="table table-sm mb-0"><thead><tr><th>Session</th><th>Signed in</th><th>Expires</th><th>Status</th></tr></thead>
+              <tbody id="accSessions"></tbody></table></div></div>
+          </div></div>
+
+          <div class="col-12"><div class="card border-danger"><div class="card-header text-danger">Danger zone</div><div class="card-body">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div class="small-13 muted">Permanently delete your account, models and all prediction history.</div>
+              <div class="d-flex gap-2">
+                <input id="accDelPw" class="form-control form-control-sm" type="password" placeholder="Confirm password" style="max-width:200px">
+                <button class="btn btn-sm btn-danger" id="accDelete">Delete my account</button>
+              </div>
+            </div>
+          </div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== OVERLAYS ==================== -->
+<div class="overlay" id="overlay">
+  <div class="loader-box">
+    <div class="spinner"></div>
+    <div class="fw-bold mb-1" id="loadTitle">Working…</div>
+    <div class="muted small-13 mb-3" id="loadMsg">Please wait</div>
+    <div class="pbar"><div id="loadBar"></div></div>
+  </div>
+</div>
+<div class="toast-wrap" id="toasts"></div>
+
+<!-- history detail modal -->
+<div class="modal fade" id="histModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Prediction detail</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body" id="histModalBody"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="/js/inference.js"></script>
+<script src="/js/ml.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>
